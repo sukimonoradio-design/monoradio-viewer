@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#161a26">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ものラジオ">
+<title>ものラジオ ビューア</title>
+<link rel="preconnect" href="https://monoradio102.github.io">
+<style>
+/* VOICE: 朝の空き時間にサッと。大きく、迷わず、押し間違えない
+   IDEA: ラジオのチューナー。上の日付ダイヤルを横に回して局（日）を合わせる
+   PICTURE: その日のカード画像＋再生ボタン。押した時だけ本編プレーヤーを読む
+   COLOUR/TYPE: 局の色（インク紺・黄・ピンク・水色）、端末の標準フォント
+   LAYOUT: 上に固定の日付バー、真ん中に番組、下に親指で届く前日/翌日ボタン */
+:root{--ink:#161a26;--ink2:#20263a;--ink3:#2b3350;--line:#39425f;--fg:#f4f5fa;--sub:#a9b0c8;--y:#ffd028;--p:#ff4468;--c:#3fe0dc;
+  --top:env(safe-area-inset-top,0px);--bot:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html{scroll-padding-top:150px;background:var(--ink)}
+body{margin:0;background:var(--ink);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;overflow-x:clip;padding-bottom:calc(84px + var(--bot))}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--c)}
+:focus-visible{outline:3px solid var(--c);outline-offset:2px}
+
+/* 上の固定バー */
+.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--ink) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding-top:var(--top);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:10px;padding:8px 14px 4px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;flex:1;white-space:nowrap}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--p);box-shadow:0 0 0 4px #ff446833}
+.lang{display:flex;background:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:3px}
+.lang button{border:0;background:none;min-width:52px;height:38px;border-radius:999px;font-weight:700;font-size:14px;color:var(--sub)}
+.lang button[aria-pressed=true]{background:var(--y);color:var(--ink)}
+.lang button:disabled{opacity:.35}
+.dates{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;padding:8px 14px 12px;scrollbar-width:none;overscroll-behavior-x:contain}
+.dates::-webkit-scrollbar{display:none}
+.d{flex:none;scroll-snap-align:center;width:58px;height:64px;border-radius:14px;border:1.5px solid var(--line);background:var(--ink2);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;padding:0}
+.d .m{font-size:11px;color:var(--sub)}
+.d .n{font-size:22px;font-weight:800;margin:2px 0}
+.d .w{font-size:12px;color:var(--sub)}
+.d.sun .w{color:#ff7a90}.d.sat .w{color:#7ab8ff}
+.d[aria-current=true]{background:var(--y);border-color:var(--y);color:var(--ink)}
+.d[aria-current=true] :is(.m,.w){color:var(--ink)}
+
+/* 番組 */
+main{max-width:720px;margin:0 auto;padding:16px 14px}
+.when{color:var(--sub);font-size:14px;display:flex;gap:10px;flex-wrap:wrap}
+h1{font-size:clamp(22px,6vw,30px);line-height:1.3;margin:4px 0 14px;text-wrap:balance}
+.stage{position:relative;aspect-ratio:16/10;border-radius:16px;overflow:hidden;background:var(--ink2) center/cover no-repeat;border:1px solid var(--line)}
+.stage.on{aspect-ratio:auto;height:calc(min(100vw - 28px, 692px) * .5625 + 74px);background:#000}
+.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.play{position:absolute;inset:0;width:100%;border:0;background:linear-gradient(transparent 45%,#000a);display:flex;align-items:flex-end;justify-content:flex-start;padding:14px}
+.play span{display:inline-flex;align-items:center;gap:10px;background:var(--y);color:var(--ink);font-weight:800;font-size:17px;height:52px;padding:0 22px 0 16px;border-radius:999px;box-shadow:0 6px 20px #0006}
+.play svg{width:22px;height:22px}
+.note{font-size:13px;color:var(--sub);margin:8px 2px 0}
+
+.sec{font-size:13px;font-weight:700;color:var(--sub);margin:26px 2px 10px;letter-spacing:.02em}
+.news{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.head{padding:14px 16px 4px;display:flex;gap:12px;align-items:flex-start}
+.num{flex:none;width:28px;height:28px;border-radius:8px;background:var(--ink3);color:var(--y);font-weight:800;display:grid;place-items:center;font-size:14px}
+.card.hl .num{background:var(--p);color:#fff}
+.head h2{font-size:18px;line-height:1.4;margin:1px 0 0}
+.pts{margin:6px 0 0;padding:0 16px 6px 56px}
+.pts li{margin:4px 0}
+.pts details summary{list-style:none;cursor:pointer}
+.pts details summary::-webkit-details-marker{display:none}
+.pts details summary::after{content:" ＋";color:var(--c);font-size:13px}
+.pts details[open] summary::after{content:" －"}
+.pts details p{margin:6px 0 8px;font-size:15px;color:var(--sub);background:var(--ink);border-radius:10px;padding:10px 12px}
+.link{display:flex;gap:12px;align-items:center;margin:8px 12px 12px;padding:10px;border-radius:12px;background:var(--ink);text-decoration:none;color:var(--fg);min-height:64px;border:1px solid var(--line)}
+.link img{flex:none;width:92px;aspect-ratio:1.91;object-fit:cover;border-radius:8px;background:var(--ink3)}
+.link .t{font-size:14px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.link .s{font-size:12px;color:var(--sub);margin-top:2px}
+.link .go{flex:none;margin-left:auto;color:var(--c);font-weight:800}
+
+.script{margin-top:12px;background:var(--ink2);border:1px solid var(--line);border-radius:16px}
+.script summary{padding:0 16px;height:54px;display:flex;align-items:center;font-weight:700;cursor:pointer;list-style:none}
+.script summary::-webkit-details-marker{display:none}
+.script summary::after{content:"開く";margin-left:auto;color:var(--c);font-size:14px}
+.script[open] summary::after{content:"閉じる"}
+.script .body{padding:0 16px 14px;font-size:15px;color:#d6d9e6}
+.script h3{font-size:14px;color:var(--y);margin:14px 0 4px}
+.script p{margin:4px 0}
+.src{font-size:13px;color:var(--sub);margin:22px 2px}
+
+.state{text-align:center;padding:48px 10px;color:var(--sub)}
+.state button{margin-top:14px;height:48px;padding:0 24px;border-radius:999px;border:0;background:var(--y);color:var(--ink);font-weight:800}
+.sk{background:linear-gradient(90deg,var(--ink2),var(--ink3),var(--ink2));background-size:200% 100%;animation:sk 1.2s infinite;border-radius:12px}
+@keyframes sk{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.sk{animation:none}}
+
+/* 下の前日／翌日（親指で届く位置、左右に大きく離す） */
+.foot{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:10px 14px calc(10px + var(--bot));background:color-mix(in srgb,var(--ink) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+.foot button{height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--ink2);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.foot button:disabled{opacity:.3}
+.toast{position:fixed;left:50%;bottom:calc(90px + var(--bot));transform:translateX(-50%);background:var(--fg);color:var(--ink);padding:8px 16px;border-radius:999px;font-size:14px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="logo"><span class="dot"></span><span id="sname">ものラジオ</span></div>
+    <div class="lang" role="group" aria-label="言語">
+      <button data-l="ja" aria-pressed="true">日本語</button>
+      <button data-l="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <nav class="dates" id="dates" aria-label="日付をえらぶ"></nav>
+</header>
+
+<main id="main"><div class="state"><div class="sk" style="height:28px;width:70%;margin:0 auto 16px"></div><div class="sk" style="aspect-ratio:16/10"></div></div></main>
+
+<div class="foot">
+  <button id="prev">‹ 前の日</button>
+  <button id="next">次の日 ›</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+{
+const BASE = (new URLSearchParams(location.search).get("base") || "https://monoradio102.github.io/myradio/").replace(/\/?$/, "/");
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const WD = { ja: ["日","月","火","水","木","金","土"], en: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"] };
+const T = {
+  ja: { play: "番組を再生", prev: "‹ 前の日", next: "次の日 ›", news: "きょうのニュース", script: "台本を全部読む", op: "オープニング", cl: "エンディング", open: "開く", none: "この日の放送は見つかりませんでした", err: "読み込めませんでした", retry: "もう一度", sec: "秒", note: "音声は直近30日分のみ。それより前は台本で読めます。", src: "元のページで見る ↗", newest: "最新", oldest: "これより前はありません", latest: "これが最新です", nolang: "この日は日本語版のみです" },
+  en: { play: "Play episode", prev: "‹ Prev", next: "Next ›", news: "Today's stories", script: "Read the full script", op: "Opening", cl: "Closing", open: "Open", none: "No episode for this day", err: "Couldn't load", retry: "Retry", sec: "s", note: "Audio is kept for the latest 30 days; older episodes can be read.", src: "Open the original page ↗", newest: "NEW", oldest: "Nothing earlier", latest: "This is the latest", nolang: "Not available in this language" }
+};
+let EPS = [], date = "", lang = "ja";
+try { lang = localStorage.getItem("mr-lang") || "ja"; } catch {}
+const cache = new Map();
+const get = async path => {
+  if (!cache.has(path)) cache.set(path, fetch(BASE + path, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).catch(e => { cache.delete(path); throw e; }));
+  return cache.get(path);
+};
+const toast = msg => { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 1600); };
+const fmtTime = s => { s = Math.round(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const idx = () => EPS.findIndex(e => e.date === date);
+const has = (e, l) => !!(e && e[l]);
+
+function drawDates() {
+  $("dates").innerHTML = EPS.map((e, i) => {
+    const d = new Date(e.date + "T00:00:00"), w = d.getDay();
+    return `<button class="d${w === 0 ? " sun" : w === 6 ? " sat" : ""}" data-date="${esc(e.date)}" aria-current="${e.date === date}" aria-label="${esc(e.date)}">
+      <span class="m">${lang === "ja" ? (d.getMonth() + 1) + "月" : d.toLocaleString("en", { month: "short" })}</span><span class="n">${d.getDate()}</span><span class="w">${i === 0 ? T[lang].newest : WD[lang][w]}</span></button>`;
+  }).join("");
+  const cur = $("dates").querySelector("[aria-current=true]");
+  if (cur) cur.scrollIntoView({ inline: "center", block: "nearest" });
+}
+function drawChrome() {
+  document.documentElement.lang = lang;
+  for (const b of document.querySelectorAll(".lang button")) {
+    b.setAttribute("aria-pressed", b.dataset.l === lang);
+    b.disabled = !has(EPS[idx()], b.dataset.l) && EPS.length > 0;
+  }
+  $("prev").textContent = T[lang].prev; $("next").textContent = T[lang].next;
+  const i = idx();
+  $("prev").disabled = i < 0 || i >= EPS.length - 1;
+  $("next").disabled = i <= 0;
+}
+
+async function show() {
+  const t = T[lang], e = EPS[idx()];
+  drawChrome();
+  if (!e) { $("main").innerHTML = `<div class="state">${t.none}</div>`; return; }
+  if (!has(e, lang)) lang = has(e, "ja") ? "ja" : "en";
+  const name = `${date}-${lang}`, want = name;
+  const meta = e[lang];
+  $("main").innerHTML = `<div class="when"><span>${esc(date.replace(/-/g, "/"))}（${WD[lang][new Date(date + "T00:00:00").getDay()]}）</span><span>▶ ${fmtTime(meta.seconds)}</span></div>
+    <h1>${esc(meta.title)}</h1>
+    <div class="stage" id="stage" style="background-image:url('${esc(BASE)}share/${esc(name)}.jpg')">
+      <button class="play" id="play" aria-label="${t.play}"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${t.play}</span></button>
+    </div>
+    <p class="note">${t.note}</p>
+    <div id="body"><div class="sk" style="height:140px;margin-top:26px"></div><div class="sk" style="height:140px;margin-top:12px"></div></div>`;
+  $("play").onclick = () => {
+    $("stage").classList.add("on");
+    $("stage").innerHTML = `<iframe src="${esc(BASE)}?embed=1#${esc(date)}/${esc(lang)}" allow="autoplay; clipboard-write; web-share" title="${esc(meta.title)}"></iframe>`;
+  };
+  drawChrome();
+  let ep;
+  try { ep = await get(`episodes/${name}.json`); }
+  catch { if (want === `${date}-${lang}`) $("body").innerHTML = `<div class="state">${t.err}<br><button id="retry">${t.retry}</button></div>`; $("retry") && ($("retry").onclick = show); return; }
+  if (want !== `${date}-${lang}`) return;
+  const lines = arr => (arr || []).map(l => `<p>${esc(l.show || l.say)}</p>`).join("");
+  $("body").innerHTML = `<div class="sec">${t.news}</div><ol class="news">${(ep.news || []).map((n, i) => {
+      const L = n.link && !n.link.status ? n.link : null, url = (L && L.url) || n.url;
+      return `<li class="card${ep.highlight === i ? " hl" : ""}">
+        <div class="head"><span class="num">${i + 1}</span><h2>${esc(n.label)}</h2></div>
+        <ul class="pts">${(n.points || []).map((p, j) => n.details && n.details[j]
+          ? `<li><details><summary>${esc(p)}</summary><p>${esc(n.details[j])}</p></details></li>`
+          : `<li>${esc(p)}</li>`).join("")}</ul>
+        ${url ? `<a class="link" href="${esc(url)}" target="_blank" rel="noopener">
+          ${L && L.image ? `<img src="${esc(L.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+          <span><span class="t">${esc((L && L.title) || url)}</span><span class="s">${esc((L && L.site) || new URL(url).hostname)}</span></span>
+          <span class="go">↗</span></a>` : ""}
+      </li>`; }).join("")}</ol>
+    <details class="script"><summary>${t.script}</summary><div class="body">
+      <h3>${t.op}</h3>${lines(ep.opening)}
+      ${(ep.news || []).map((n, i) => `<h3>${i + 1}. ${esc(n.label)}</h3>${lines(n.lines)}`).join("")}
+      <h3>${t.cl}</h3>${lines(ep.closing)}</div></details>
+    <p class="src"><a href="${esc(BASE)}#${esc(date)}/${esc(lang)}" target="_blank" rel="noopener">${t.src}</a></p>`;
+  // 隣の日を先読みしておく（押した瞬間に出るように）
+  const i = idx();
+  for (const n of [EPS[i + 1], EPS[i - 1]]) if (has(n, lang)) get(`episodes/${n.date}-${lang}.json`).catch(() => {});
+}
+
+function go(d, l = lang, push = true) {
+  const changed = d !== date;
+  date = d; lang = l;
+  if (push) history.replaceState(null, "", `#${date}/${lang}`);
+  drawDates(); show();
+  if (changed) window.scrollTo({ top: 0 });
+}
+$("dates").addEventListener("click", ev => { const b = ev.target.closest(".d"); if (b) go(b.dataset.date); });
+for (const b of document.querySelectorAll(".lang button")) b.onclick = () => {
+  if (b.dataset.l === lang) return;
+  if (!has(EPS[idx()], b.dataset.l)) return toast(T[lang].nolang);
+  try { localStorage.setItem("mr-lang", b.dataset.l); } catch {}
+  go(date, b.dataset.l);
+};
+$("prev").onclick = () => { const i = idx(); if (i < EPS.length - 1) go(EPS[i + 1].date); else toast(T[lang].oldest); };
+$("next").onclick = () => { const i = idx(); if (i > 0) go(EPS[i - 1].date); else toast(T[lang].latest); };
+addEventListener("keydown", e => { if (e.key === "ArrowLeft") $("prev").click(); if (e.key === "ArrowRight") $("next").click(); });
+addEventListener("hashchange", () => { const [d, l] = location.hash.slice(1).split("/"); if (d && (d !== date || (l && l !== lang))) go(d, l || lang, false); });
+
+async function boot() {
+  try {
+    const st = await get("station.json").catch(() => null);
+    EPS = await get("episodes.json");
+    if (!Array.isArray(EPS) || !EPS.length) throw 0;
+    EPS = EPS.filter(e => e && e.date).sort((a, b) => b.date.localeCompare(a.date));
+    if (st && st.name) $("sname").textContent = st.name;
+    const [d, l] = location.hash.slice(1).split("/");
+    go(EPS.some(e => e.date === d) ? d : EPS[0].date, l === "en" || l === "ja" ? l : lang);
+  } catch {
+    $("main").innerHTML = `<div class="state">${T[lang].err}<br><button id="retry">${T[lang].retry}</button></div>`;
+    $("retry").onclick = () => { cache.clear(); boot(); };
+  }
+}
+// アプリに戻ってきたとき、新しい回が出ていれば一覧を更新
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden || !EPS.length) return;
+  cache.delete("episodes.json");
+  try { const n = await get("episodes.json"); if (n[0] && n[0].date !== EPS[0].date) { EPS = n.sort((a, b) => b.date.localeCompare(a.date)); drawDates(); drawChrome(); } } catch {}
+});
+boot();
+}
+</script>
+</body>
+</html>
