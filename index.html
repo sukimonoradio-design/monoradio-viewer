@@ -19,7 +19,7 @@
 :root{--ink:#161a26;--ink2:#20263a;--ink3:#2b3350;--line:#39425f;--fg:#f4f5fa;--sub:#a9b0c8;--y:#ffd028;--p:#ff4468;--c:#3fe0dc;
   --top:env(safe-area-inset-top,0px);--bot:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
-html{scroll-padding-top:150px;background:var(--ink)}
+html{scroll-padding-top:calc(var(--hdr,150px) + 260px);background:var(--ink)}
 body{margin:0;background:var(--ink);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;overflow-x:clip;padding-bottom:calc(84px + var(--bot))}
 button{font:inherit;color:inherit;cursor:pointer}
 a{color:var(--c)}
@@ -48,6 +48,8 @@ a{color:var(--c)}
 main{max-width:720px;margin:0 auto;padding:16px 14px}
 .when{color:var(--sub);font-size:14px;display:flex;gap:10px;flex-wrap:wrap}
 h1{font-size:clamp(22px,6vw,30px);line-height:1.3;margin:4px 0 14px;text-wrap:balance}
+.dock{position:sticky;top:var(--hdr,150px);z-index:5;background:var(--ink);margin:0 -14px;padding:0 14px 10px}
+.dock.stuck{box-shadow:0 10px 18px -10px #000c}
 .stage{position:relative;aspect-ratio:16/10;border-radius:16px;overflow:hidden;background:var(--ink2) center/cover no-repeat;border:1px solid var(--line)}
 .stage.on{aspect-ratio:auto;height:calc(min(100vw - 28px, 692px) * .5625 + 74px);background:#000}
 .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -56,7 +58,16 @@ h1{font-size:clamp(22px,6vw,30px);line-height:1.3;margin:4px 0 14px;text-wrap:ba
 .play svg{width:22px;height:22px}
 .note{font-size:13px;color:var(--sub);margin:8px 2px 0}
 
-.sec{font-size:13px;font-weight:700;color:var(--sub);margin:26px 2px 10px;letter-spacing:.02em}
+.pull{margin-top:18px;background:var(--ink2);border:1px solid var(--line);border-radius:16px}
+.pull>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;height:60px;padding:0 16px;font-weight:800;font-size:17px}
+.pull>summary::-webkit-details-marker{display:none}
+.pull>summary .cnt{font-size:13px;font-weight:700;color:var(--ink);background:var(--y);border-radius:999px;padding:2px 10px}
+.pull>summary::after{content:"";margin-left:auto;width:12px;height:12px;border-right:3px solid var(--c);border-bottom:3px solid var(--c);transform:translateY(-3px) rotate(45deg);transition:transform .2s}
+.pull[open]>summary::after{transform:translateY(3px) rotate(-135deg)}
+.pull .news{padding:0 10px 12px}
+.pull .card{background:var(--ink)}
+.pull .link{background:var(--ink2)}
+@media(prefers-reduced-motion:reduce){.pull>summary::after{transition:none}}
 .news{list-style:none;margin:0;padding:0;display:grid;gap:12px}
 .card{background:var(--ink2);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .head{padding:14px 16px 4px;display:flex;gap:12px;align-items:flex-start}
@@ -130,7 +141,8 @@ const T = {
   ja: { play: "番組を再生", prev: "‹ 前の日", next: "次の日 ›", news: "きょうのニュース", script: "台本を全部読む", op: "オープニング", cl: "エンディング", open: "開く", none: "この日の放送は見つかりませんでした", err: "読み込めませんでした", retry: "もう一度", sec: "秒", note: "音声は直近30日分のみ。それより前は台本で読めます。", src: "元のページで見る ↗", newest: "最新", oldest: "これより前はありません", latest: "これが最新です", nolang: "この日は日本語版のみです" },
   en: { play: "Play episode", prev: "‹ Prev", next: "Next ›", news: "Today's stories", script: "Read the full script", op: "Opening", cl: "Closing", open: "Open", none: "No episode for this day", err: "Couldn't load", retry: "Retry", sec: "s", note: "Audio is kept for the latest 30 days; older episodes can be read.", src: "Open the original page ↗", newest: "NEW", oldest: "Nothing earlier", latest: "This is the latest", nolang: "Not available in this language" }
 };
-let EPS = [], date = "", lang = "ja";
+let EPS = [], date = "", lang = "ja", newsOpen = false;
+try { newsOpen = localStorage.getItem("mr-news") === "1"; } catch {}
 try { lang = localStorage.getItem("mr-lang") || "ja"; } catch {}
 const cache = new Map();
 const get = async path => {
@@ -172,9 +184,9 @@ async function show() {
   const meta = e[lang];
   $("main").innerHTML = `<div class="when"><span>${esc(date.replace(/-/g, "/"))}（${WD[lang][new Date(date + "T00:00:00").getDay()]}）</span><span>▶ ${fmtTime(meta.seconds)}</span></div>
     <h1>${esc(meta.title)}</h1>
-    <div class="stage" id="stage" style="background-image:url('${esc(BASE)}share/${esc(name)}.jpg')">
+    <div class="dock" id="dock"><div class="stage" id="stage" style="background-image:url('${esc(BASE)}share/${esc(name)}.jpg')">
       <button class="play" id="play" aria-label="${t.play}"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${t.play}</span></button>
-    </div>
+    </div></div>
     <p class="note">${t.note}</p>
     <div id="body"><div class="sk" style="height:140px;margin-top:26px"></div><div class="sk" style="height:140px;margin-top:12px"></div></div>`;
   $("play").onclick = () => {
@@ -187,7 +199,7 @@ async function show() {
   catch { if (want === `${date}-${lang}`) $("body").innerHTML = `<div class="state">${t.err}<br><button id="retry">${t.retry}</button></div>`; $("retry") && ($("retry").onclick = show); return; }
   if (want !== `${date}-${lang}`) return;
   const lines = arr => (arr || []).map(l => `<p>${esc(l.show || l.say)}</p>`).join("");
-  $("body").innerHTML = `<div class="sec">${t.news}</div><ol class="news">${(ep.news || []).map((n, i) => {
+  $("body").innerHTML = `<details class="pull" id="newsPull"${newsOpen ? " open" : ""}><summary>${t.news}<span class="cnt">${(ep.news || []).length}${lang === "ja" ? "本" : ""}</span></summary><ol class="news">${(ep.news || []).map((n, i) => {
       const L = n.link && !n.link.status ? n.link : null, url = (L && L.url) || n.url;
       return `<li class="card${ep.highlight === i ? " hl" : ""}">
         <div class="head"><span class="num">${i + 1}</span><h2>${esc(n.label)}</h2></div>
@@ -198,12 +210,16 @@ async function show() {
           ${L && L.image ? `<img src="${esc(L.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
           <span><span class="t">${esc((L && L.title) || url)}</span><span class="s">${esc((L && L.site) || new URL(url).hostname)}</span></span>
           <span class="go">↗</span></a>` : ""}
-      </li>`; }).join("")}</ol>
+      </li>`; }).join("")}</ol></details>
     <details class="script"><summary>${t.script}</summary><div class="body">
       <h3>${t.op}</h3>${lines(ep.opening)}
       ${(ep.news || []).map((n, i) => `<h3>${i + 1}. ${esc(n.label)}</h3>${lines(n.lines)}`).join("")}
       <h3>${t.cl}</h3>${lines(ep.closing)}</div></details>
     <p class="src"><a href="${esc(BASE)}#${esc(date)}/${esc(lang)}" target="_blank" rel="noopener">${t.src}</a></p>`;
+  $("newsPull").addEventListener("toggle", ev => {
+    newsOpen = ev.target.open;
+    try { localStorage.setItem("mr-news", newsOpen ? "1" : "0"); } catch {}
+  });
   // 隣の日を先読みしておく（押した瞬間に出るように）
   const i = idx();
   for (const n of [EPS[i + 1], EPS[i - 1]]) if (has(n, lang)) get(`episodes/${n.date}-${lang}.json`).catch(() => {});
@@ -248,6 +264,12 @@ document.addEventListener("visibilitychange", async () => {
   cache.delete("episodes.json");
   try { const n = await get("episodes.json"); if (n[0] && n[0].date !== EPS[0].date) { EPS = n.sort((a, b) => b.date.localeCompare(a.date)); drawDates(); drawChrome(); } } catch {}
 });
+// 動画を日付バーのすぐ下に止める：バーの高さをはかって渡す
+new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", document.querySelector(".top").offsetHeight + "px")).observe(document.querySelector(".top"));
+addEventListener("scroll", () => {
+  const d = $("dock"); if (!d) return;
+  d.classList.toggle("stuck", d.getBoundingClientRect().top <= document.querySelector(".top").offsetHeight + 0.5 && scrollY > 40);
+}, { passive: true });
 boot();
 }
 </script>
