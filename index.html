@@ -19,7 +19,7 @@
 :root{--ink:#161a26;--ink2:#20263a;--ink3:#2b3350;--line:#39425f;--fg:#f4f5fa;--sub:#a9b0c8;--y:#ffd028;--p:#ff4468;--c:#3fe0dc;
   --top:env(safe-area-inset-top,0px);--bot:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
-html{scroll-padding-top:calc(var(--hdr,150px) + 260px);background:var(--ink)}
+html{scroll-padding-top:calc(var(--hdr,150px) + 8px);background:var(--ink)}
 body{margin:0;background:var(--ink);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;overflow-x:clip;padding-bottom:calc(84px + var(--bot))}
 button{font:inherit;color:inherit;cursor:pointer}
 a{color:var(--c)}
@@ -48,10 +48,8 @@ a{color:var(--c)}
 main{max-width:720px;margin:0 auto;padding:16px 14px}
 .when{color:var(--sub);font-size:14px;display:flex;gap:10px;flex-wrap:wrap}
 h1{font-size:clamp(22px,6vw,30px);line-height:1.3;margin:4px 0 14px;text-wrap:balance}
-.dock{position:sticky;top:var(--hdr,150px);z-index:5;background:var(--ink);margin:0 -14px;padding:0 14px 10px}
-.dock.stuck{box-shadow:0 10px 18px -10px #000c}
 .stage{position:relative;aspect-ratio:16/10;border-radius:16px;overflow:hidden;background:var(--ink2) center/cover no-repeat;border:1px solid var(--line)}
-.stage.on{aspect-ratio:auto;height:calc(min(100vw - 28px, 692px) * .5625 + 74px);background:#000}
+.stage.on{aspect-ratio:auto;height:min(calc(min(100vw - 28px, 692px) * 16 / 9 + 76px), calc(100svh - var(--hdr,150px) - 104px - var(--bot)), 900px);min-height:420px;background:#000}
 .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .play{position:absolute;inset:0;width:100%;border:0;background:linear-gradient(transparent 45%,#000a);display:flex;align-items:flex-end;justify-content:flex-start;padding:14px}
 .play span{display:inline-flex;align-items:center;gap:10px;background:var(--y);color:var(--ink);font-weight:800;font-size:17px;height:52px;padding:0 22px 0 16px;border-radius:999px;box-shadow:0 6px 20px #0006}
@@ -184,13 +182,14 @@ async function show() {
   const meta = e[lang];
   $("main").innerHTML = `<div class="when"><span>${esc(date.replace(/-/g, "/"))}（${WD[lang][new Date(date + "T00:00:00").getDay()]}）</span><span>▶ ${fmtTime(meta.seconds)}</span></div>
     <h1>${esc(meta.title)}</h1>
-    <div class="dock" id="dock"><div class="stage" id="stage" style="background-image:url('${esc(BASE)}share/${esc(name)}.jpg')">
+    <div class="stage" id="stage" style="background-image:url('${esc(BASE)}share/${esc(name)}.jpg')">
       <button class="play" id="play" aria-label="${t.play}"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${t.play}</span></button>
-    </div></div>
+    </div>
     <p class="note">${t.note}</p>
     <div id="body"><div class="sk" style="height:140px;margin-top:26px"></div><div class="sk" style="height:140px;margin-top:12px"></div></div>`;
   $("play").onclick = () => {
     $("stage").classList.add("on");
+    requestAnimationFrame(() => $("stage").scrollIntoView({ block: "start", behavior: "smooth" }));
     $("stage").innerHTML = `<iframe src="${esc(BASE)}?embed=1#${esc(date)}/${esc(lang)}" allow="autoplay; clipboard-write; web-share" title="${esc(meta.title)}"></iframe>`;
   };
   drawChrome();
@@ -264,12 +263,8 @@ document.addEventListener("visibilitychange", async () => {
   cache.delete("episodes.json");
   try { const n = await get("episodes.json"); if (n[0] && n[0].date !== EPS[0].date) { EPS = n.sort((a, b) => b.date.localeCompare(a.date)); drawDates(); drawChrome(); } } catch {}
 });
-// 動画を日付バーのすぐ下に止める：バーの高さをはかって渡す
+// 日付バーの高さをはかって渡す（縦プレーヤーの高さ合わせ用）
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", document.querySelector(".top").offsetHeight + "px")).observe(document.querySelector(".top"));
-addEventListener("scroll", () => {
-  const d = $("dock"); if (!d) return;
-  d.classList.toggle("stuck", d.getBoundingClientRect().top <= document.querySelector(".top").offsetHeight + 0.5 && scrollY > 40);
-}, { passive: true });
 boot();
 }
 </script>
